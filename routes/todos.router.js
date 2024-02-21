@@ -122,9 +122,28 @@ router.patch("/todos/:todoId", async (req, res) => {
     return res.status(200).json({});
 });
 
+//----------------------------------------------------------------------------
+/** * 할 일 삭제 API * **/
+router.delete("/todos/:todoId", async (req, res, next) => {
+    const { todoId } = req.params;
+
+    const todo = await Todo.findById(todoId).exec();
+    if (!todo) {
+        return res
+            .status(404)
+            .json({ errorMessage: "존재하지 않는 해야할 일 정보입니다." });
+    }
+
+    // 기본키를 삭제하게 된다. -> _id 로 작성한다.
+    //  => _id 로 작성하게 되면 어떤 값을 기준으로 해당하는 데이터 일치했을 때 삭제할 수 있을지 정할 수 있다.
+    //  ===> 기본적으로 mongoDB는 _id 라고 하는 값이, 내가 전달받은 todoId 에 해당한다.
+    await Todo.deleteOne({ _id: todoId });
+
+    return res.status(200).json({});
+});
+
 // 생성한 라우터를 실제 외부로 보내줄 수 있도록 만들어줘야한다.
 // -> todos.router.js 의 router를 외부로 보내줄 수 있게 된다.
 // => 외부로 보내준 라우터를 실제 우리가 사용하는 express에 적용시켜줘야한다.
 // ===> app.js 로 가자!
-
 export default router;

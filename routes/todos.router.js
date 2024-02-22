@@ -1,6 +1,6 @@
 // express 가져오기
 import express from "express";
-
+import Joi from "joi";
 // todoSchema 사용을 위해 가져오기
 import Todo from "../schemas/todo.schema.js";
 
@@ -8,41 +8,62 @@ import Todo from "../schemas/todo.schema.js";
 const router = express.Router();
 
 //----------------------------------------------------------------------------
+/** * Joi * **/
+// 👉 **할 일 생성 API 유효성 검사 요구사항**
+// 1. `value` 데이터는 **필수적으로 존재**해야한다.
+// 2. `value` 데이터는 **문자열 타입**이어야한다.
+// 3. `value` 데이터는 **최소 1글자 이상**이어야한다.
+// 4. `value` 데이터는 **최대 50글자 이하**여야한다.
+// 5. 유효성 검사에 실패했을 때, 에러가 발생해야한다.
+const createdTodoSchema = Joi.object({
+    value: Joi.string().min(1).max(50).required(),
+});
+
+//----------------------------------------------------------------------------
 /** * 할일 등록 API * **/
 // API를 구현할 때는 해당 라우터로 구현 시작.
 router.post("/todos", async (req, res, next) => {
-    // 1. 클라이언트로부터 받아온 value 데이터를 가져온다.
-    const { value } = req.body;
+    try {
+        // 1. 클라이언트로부터 받아온 value 데이터를 가져온다.
+        // const { value } = req.body;
 
-    // 1-2. 만약 클라이언트가 value 데이터를 전달하지 않았을 때, 클라이언트에게 에러 메세지를 전달한다.
-    if (!value) {
-        return res.status(400).json({
-            errorMessage: "해야할 일(value) 데이터가 존재하지 않습니다.",
-        });
-    }
+        const validation = await createdTodoSchema.validateAsync(req.body);
 
-    // 2. 해당하는 마지막 order 데이터를 조회한다.
-    /* 		Todo 라고 하는 것을 가져와야한다. 이건 그 전에 todo.schema.js 에서 구현한 것을 확인할 수 있다.
+        const { value } = validation;
+
+        // 1-2. 만약 클라이언트가 value 데이터를 전달하지 않았을 때, 클라이언트에게 에러 메세지를 전달한다.
+        if (!value) {
+            return res.status(400).json({
+                errorMessage: "해야할 일(value) 데이터가 존재하지 않습니다.",
+            });
+        }
+
+        // 2. 해당하는 마지막 order 데이터를 조회한다.
+        /* 		Todo 라고 하는 것을 가져와야한다. 이건 그 전에 todo.schema.js 에서 구현한 것을 확인할 수 있다.
 			export default mongoose.model('Todo', todoSchema);
 			-> todoSchema를 mongoose의 model에 만들어서 외부에 전달하고 있는 것.
     		===> Todo란 todoSchema에 있는 mongoose.model 이다. */
-    // findOne = 1개의 데이터만 조회한다.
-    // sort : 정렬한다. -> 어떤 컬럼을? order 라는 컬럼을! 어떤 데이터베이스? No! 컬렉션! Todo라는 컬렉션에서 찾는다.
-    // order 앞에 마이너스(-)를 붙여 내림차순으로 정렬할 수 있게 만든다.
-    // 	exec() 메서드
-    //	mongoose에서 exec()는 결과를 반환하기 위해 쿼리를 실행하고, 이 결과로 Promise를 반환.
-    //	===> mongoose 조회할 때는 .exec() 메서드를 무조건 붙이는걸로!
-    const todoMaxOrder = await Todo.findOne().sort("-order").exec();
+        // findOne = 1개의 데이터만 조회한다.
+        // sort : 정렬한다. -> 어떤 컬럼을? order 라는 컬럼을! 어떤 데이터베이스? No! 컬렉션! Todo라는 컬렉션에서 찾는다.
+        // order 앞에 마이너스(-)를 붙여 내림차순으로 정렬할 수 있게 만든다.
+        // 	exec() 메서드
+        //	mongoose에서 exec()는 결과를 반환하기 위해 쿼리를 실행하고, 이 결과로 Promise를 반환.
+        //	===> mongoose 조회할 때는 .exec() 메서드를 무조건 붙이는걸로!
+        const todoMaxOrder = await Todo.findOne().sort("-order").exec();
 
-    // 3. 만약 존재한다면 현재 해야 할 일을 +1 하고, order 데이터가 존재하지 않다면, 1로 할당한다.
-    const order = todoMaxOrder ? todoMaxOrder.order + 1 : 1;
+        // 3. 만약 존재한다면 현재 해야 할 일을 +1 하고, order 데이터가 존재하지 않다면, 1로 할당한다.
+        const order = todoMaxOrder ? todoMaxOrder.order + 1 : 1;
 
-    // 4. 해야할 일 등록
-    const todo = new Todo({ value, order }); // todo 라고 하는 것을 실제 인스턴스로 만들었다.
-    await todo.save(); // 실제 데이터베이스에 저장한다.
+        // 4. 해야할 일 등록
+        const todo = new Todo({ value, order }); // todo 라고 하는 것을 실제 인스턴스로 만들었다.
+        await todo.save(); // 실제 데이터베이스에 저장한다.
 
-    // 5. 해야할 일을 클라이언트에게 반환한다.
-    return res.status(201).json({ todo: todo });
+        // 5. 해야할 일을 클라이언트에게 반환한다.
+        return res.status(201).json({ todo: todo });
+    } catch (error) {
+        // Router 다음에 있는 에러 처리 미들웨어를 실행한다.
+        next(error);
+    }
 });
 
 //----------------------------------------------------------------------------
@@ -61,12 +82,12 @@ router.get("/todos", async (req, res, next) => {
 /** * 해아할 일 순서 변경 API * **/
 // 목록중에 어떤 것을 수정해야할지 알기 위해서 todoId 사용
 // 데이터베이스를 사용할 것이기 때문에 비동기적인 처리를 동기적으로 수정할 수 있도록 구현해야 하기 때문에 async 사용.
-router.patch("/todos/:todoId", async (req, res) => {
+router.patch("/todos/:todoId", async (req, res, next) => {
     //	=> 값 가져오기
     // 어떤 할일을 변경해야 할지 알아야 한다.
     const { todoId } = req.params;
     // 순서 변경 : 실제로 클라이언트가 해당하는 값을 몇 번 순서로 변경할건지에 대한 내용 가져오기
-    const { order, done } = req.body;
+    const { order, done, value } = req.body;
 
     // 실제 로직
     // 현재 나의 order가 무엇인지 알아야한다.
@@ -102,6 +123,7 @@ router.patch("/todos/:todoId", async (req, res) => {
         // 변경하려는 '해야할 일'의 order 값을 변경합니니다.
         currentTodo.order = order;
     }
+
     //----------------------------------------------------------------------------
     /** * 해아할 일 순서 변경, 완료 / 해제 API * **/
     // done의 값을 전달 받았지만, done이 null이나 true일때만 조건문 실행
@@ -112,6 +134,11 @@ router.patch("/todos/:todoId", async (req, res) => {
         // done 값이 존재했을 때는 현재 시간 넣어주고, 존재하지 않았을 때는 null 넣어준다.
         currentTodo.doneAt = done ? new Date() : null;
         console.log("Done value:", done);
+    }
+    //----------------------------------------------------------------------------
+    /** * 해아할 일 내용 변경 API * **/
+    if (value) {
+        currentTodo.value = value;
     }
 
     // 최종적으로 실제 데이터베이스에 저장한다.
